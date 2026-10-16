@@ -117,17 +117,19 @@ def push_gh_pages(dist: Path | None = None) -> bool:
         return False
     git_dir = dist / ".git"
     env = {**os.environ, "GIT_DIR": str(git_dir), "GIT_WORK_TREE": str(dist)}
-    try:
-        out = subprocess.check_output(
-            ["git", "credential-osxkeychain", "get"],
-            input="protocol=https\nhost=github.com\n\n",
-            text=True,
-            timeout=5,
-        )
-        creds = dict(line.split("=", 1) for line in out.strip().splitlines() if "=" in line)
-        token = creds.get("password", "")
-    except Exception:
-        token = ""
+    token = os.environ.get("PAGES_PUSH_TOKEN") or ""
+    if not token:
+        try:
+            out = subprocess.check_output(
+                ["git", "credential-osxkeychain", "get"],
+                input="protocol=https\nhost=github.com\n\n",
+                text=True,
+                timeout=5,
+            )
+            creds = dict(line.split("=", 1) for line in out.strip().splitlines() if "=" in line)
+            token = creds.get("password", "")
+        except Exception:
+            token = ""
     remote = (
         f"https://x-access-token:{token}@github.com/STARKTANG108/reddit-trend-radar.git"
         if token
