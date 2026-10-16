@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app import config, db, images, main, pipeline, scheduler, scoring  # noqa: E402
+from app import config, db, images, main, official, pipeline, scheduler, scoring  # noqa: E402
 from app.db import row, rows, tx  # noqa: E402
 from app.generator import weighted_len  # noqa: E402
 
@@ -30,6 +30,12 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
             pipeline.process_candidates()
         if config.LLM_CONFIGURED:
             pipeline.translate_missing_titles(60)
+        try:
+            official.collect_all()
+            if config.LLM_CONFIGURED:
+                official.translate_missing(30)
+        except Exception as e:
+            print(f"Official blogs update warning: {e}")
 
     now = time.time()
     dist = ROOT / "dist"
@@ -98,6 +104,7 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
         "settings": main.read_settings(),
         "subreddits": main.list_subreddits(),
         "posts": all_posts,
+        "official_blogs": official.list_blogs(limit=150),
         "tweets": main.list_tweets(status="draft,used,discarded,skipped", limit=500),
         "post_details": post_details,
     }

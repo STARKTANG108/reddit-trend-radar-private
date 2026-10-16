@@ -90,6 +90,14 @@ async function _staticApi(path, opts = {}) {
       const st = (params.get("status") || "draft").split(",").filter(Boolean);
       return (b.tweets || []).map(applyTweet).filter((t) => st.includes(t.status));
     }
+    if (pathname === "/official") {
+      const src = (params.get("source") || "").toLowerCase();
+      const q = (params.get("q") || "").toLowerCase();
+      let list = b.official_blogs || [];
+      if (src) list = list.filter((item) => (item.source || "").toLowerCase().includes(src));
+      if (q) list = list.filter((item) => (item.title || "").toLowerCase().includes(q) || (item.title_zh || "").toLowerCase().includes(q) || (item.summary || "").toLowerCase().includes(q) || (item.summary_zh || "").toLowerCase().includes(q));
+      return list;
+    }
   }
   if (pathname.startsWith("/tweets/")) {
     const parts = pathname.split("/");
@@ -231,6 +239,7 @@ async function refreshShell() {
 
 const ROUTES = {
   dashboard: { title: "仪表盘", render: renderDashboard },
+  official: { title: "官方动态", render: renderOfficial },
   radar: { title: "热帖雷达", render: renderRadar },
   queue: { title: "二创文案", render: renderQueue },
   subs: { title: "社区管理", render: renderSubs },
@@ -359,6 +368,157 @@ async function renderJobs() {
     if (r) toast(r.error ? `失败：${r.error}` : r.skipped || "完成：" + JSON.stringify(r.result), r.error ? "error" : "ok");
     route();
   }));
+}
+
+// ---------- official blogs ----------
+const LAB_COLORS = {
+  "OpenAI": { cls: "openai", dot: "openai", label: "OpenAI" },
+  "Anthropic": { cls: "anthropic", dot: "anthropic", label: "Anthropic" },
+  "Google DeepMind": { cls: "deepmind", dot: "deepmind", label: "DeepMind" },
+  "Google AI": { cls: "google-ai", dot: "google-ai", label: "Google AI" },
+  "Meta AI": { cls: "meta-ai", dot: "meta-ai", label: "Meta AI" },
+};
+
+function labBadge(source) {
+  const info = LAB_COLORS[source] || { cls: "openai", dot: "openai", label: source };
+  return `<span class="lab-badge ${info.cls}"><span class="lab-dot ${info.dot}"></span>${esc(source)}</span>`;
+}
+
+async function renderOfficial(view) {
+  refreshShell();
+  view.innerHTML = `
+    <div class="official-header">
+      <div class="lab-tabs" id="lab-tabs">
+        <div class="lab-tab active" data-src="">全部 <span class="badge-num" id="cnt-all">…</span></div>
+        <div class="lab-tab" data-src="OpenAI"><span class="lab-dot openai"></span>OpenAI <span class="badge-num" id="cnt-openai">…</span></div>
+        <div class="lab-tab" data-src="Anthropic"><span class="lab-dot anthropic"></span>Anthropic <span class="badge-num" id="cnt-anthropic">…</span></div>
+        <div class="lab-tab" data-src="Google DeepMind"><span class="lab-dot deepmind"></span>DeepMind <span class="badge-num" id="cnt-deepmind">…</span></div>
+        <div class="lab-tab" data-src="Google AI"><span class="lab-dot google-ai"></span>Google AI <span class="badge-num" id="cnt-google-ai">…</span></div>
+        <div class="lab-tab" data-src="Meta AI"><span class="lab-dot meta-ai"></span>Meta AI <span class="badge-num" id="cnt-meta-ai">…</span></div>
+      </div>
+      <div class="row" style="gap:8px">
+        <input type="text" id="official-search" placeholder="搜索官方发文标题、关键词、技术名词…" style="width:280px;padding:7px 12px;font-size:13px;border-radius:20px;border:1px solid var(--line);background:var(--panel)" />
+      </div>
+    </div>
+    <div class="official-grid" id="official-list"><div class="empty">加载中…</div></div>
+  `;
+
+  let currentSource = "";
+  let searchQuery = "";
+  let allBlogs = [];
+
+  const loadBlogs = async () => {
+    try {
+      allBlogs = await api("/official?limit=150");
+      const counts = { all: allBlogs.length, openai: 0, anthropic: 0, deepmind: 0, "google-ai": 0, "meta-ai": 0 };
+      allBlogs.forEach((b) => {
+        const s = (b.source || "").toLowerCase();
+        if (s.includes("openai")) counts.openai++;
+        else if (s.includes("anthropic")) counts.anthropic++;
+        else if (s.includes("deepmind")) counts.deepmind++;
+        else if (s.includes("google")) counts["google-ai"]++;
+        else if (s.includes("meta")) counts["meta-ai"]++;
+      });
+      const setCnt = (id, n) => { const el = $(id, view); if (el) el.textContent = n; };
+      setCnt("#cnt-all", counts.all);
+      setCnt("#cnt-openai", counts.openai);
+      setCnt("#cnt-anthropic", counts.anthropic);
+      setCnt("#cnt-deepmind", counts.deepmind);
+      setCnt("#cnt-google-ai", counts["google-ai"]);
+      setCnt("#cnt-meta-ai", counts["meta-ai"]);
+
+      renderCards();
+    } catch (e) {
+      const el = $("#official-list", view);
+      if (el) el.innerHTML = `<div class="empty">加载失败: ${esc(e.message)}</div>`;
+    }
+  };
+
+  const renderCards = () => {
+    const listEl = $("#official-list", view);
+    if (!listEl) return;
+    let filtered = allBlogs;
+    if (currentSource) {
+      filtered = filtered.filter((b) => (b.source || "").toLowerCase().includes(currentSource.toLowerCase()));
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((b) =>
+        (b.title || "").toLowerCase().includes(q) ||
+        (b.title_zh || "").toLowerCase().includes(q) ||
+        (b.summary || "").toLowerCase().includes(q) ||
+        (b.summary_zh || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (!filtered.length) {
+      listEl.innerHTML = `<div class="empty" style="grid-column:1/-1">暂无符合条件的官方发文</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered.map((b) => {
+      const titleZh = b.title_zh || b.title;
+      const showEnSub = b.title_zh && b.title_zh !== b.title;
+      const summaryText = b.summary_zh || b.summary || "暂无官方摘要";
+      return `
+        <article class="official-card">
+          <div class="official-card-meta">
+            ${labBadge(b.source)}
+            ${b.category ? `<span class="official-cat">${esc(b.category)}</span>` : ""}
+            <span class="official-card-time">${ago(b.published_at)} · ${fmtTime(b.published_at)}</span>
+          </div>
+          <div class="official-card-title">
+            <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">${esc(titleZh)}</a>
+          </div>
+          ${showEnSub ? `<div class="official-card-en">${esc(b.title)}</div>` : ""}
+          <div class="official-card-summary">${esc(summaryText)}</div>
+          <div class="official-card-foot">
+            <div class="official-card-actions">
+              <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer" class="btn sm">官方原文 ↗</a>
+              <button class="btn sm" data-copy-link="${esc(b.url)}">复制链接</button>
+              <button class="btn sm" data-draft-tweet="${esc(b.id)}">推文二创</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    $$("[data-copy-link]", listEl).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        copyText(btn.dataset.copyLink);
+        toast("官方链接已复制到剪贴板");
+      });
+    });
+
+    $$("[data-draft-tweet]", listEl).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = allBlogs.find((x) => x.id === btn.dataset.draftTweet);
+        if (!item) return;
+        const text = `【${item.source} 官方动态】${item.title_zh || item.title}\n\n${item.summary_zh || item.summary || ""}\n\n🔗 官方传送门: ${item.url}`;
+        copyText(text);
+        toast("已复制官方动态二创草稿与链接，可直接粘贴发布！");
+      });
+    });
+  };
+
+  $$(".lab-tab", view).forEach((tab) => {
+    tab.addEventListener("click", () => {
+      $$(".lab-tab", view).forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentSource = tab.dataset.src;
+      renderCards();
+    });
+  });
+
+  const searchInput = $("#official-search", view);
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value.trim();
+      renderCards();
+    });
+  }
+
+  await loadBlogs();
 }
 
 // ---------- radar ----------

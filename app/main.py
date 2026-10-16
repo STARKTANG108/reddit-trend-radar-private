@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import budget, config, images, pipeline, scheduler, scoring
+from . import budget, config, images, official, pipeline, scheduler, scoring
 from .collector import next_check_at
 from .db import get_settings, init_db, row, rows, tx, update_settings
 from .generator import weighted_len
@@ -354,6 +354,11 @@ def discard_tweet(tweet_id: int):
     with tx() as c:
         c.execute("UPDATE tweets SET status='discarded' WHERE id=? AND status='draft'", (tweet_id,))
     return {"ok": True}
+
+
+@app.get("/api/official")
+def list_official_blogs(source: str = "", limit: int = 100):
+    return official.list_blogs(source=source, limit=limit)
 
 
 @app.get("/api/subreddits")

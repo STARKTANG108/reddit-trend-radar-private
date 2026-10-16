@@ -216,6 +216,42 @@ body.drawer-open .drawer-mask { opacity: 1; pointer-events: auto; }
 .toast.error { border-left-color: var(--red); }
 @keyframes slide { from { transform: translateY(8px); opacity: 0; } }
 
+/* ---------- Official AI Lab Blogs ---------- */
+.official-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.lab-tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lab-tab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; transition: all .2s ease; user-select: none; }
+.lab-tab:hover { background: var(--panel-2); color: var(--text); border-color: #3b4756; }
+.lab-tab.active { background: rgba(255, 90, 31, .15); color: var(--accent-2); border-color: var(--accent); }
+.lab-tab .badge-num { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--panel-2); color: var(--muted); }
+.lab-tab.active .badge-num { background: var(--accent); color: #fff; }
+.lab-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.lab-dot.openai { background: #10a37f; }
+.lab-dot.anthropic { background: #d97757; }
+.lab-dot.deepmind { background: #4285f4; }
+.lab-dot.google-ai { background: #34a853; }
+.lab-dot.meta-ai { background: #0081fb; }
+
+.lab-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: .2px; }
+.lab-badge.openai { background: rgba(16, 163, 127, .15); color: #10a37f; border: 1px solid rgba(16, 163, 127, .35); }
+.lab-badge.anthropic { background: rgba(217, 119, 87, .15); color: #e08b6d; border: 1px solid rgba(217, 119, 87, .35); }
+.lab-badge.deepmind { background: rgba(66, 133, 244, .15); color: #669df6; border: 1px solid rgba(66, 133, 244, .35); }
+.lab-badge.google-ai { background: rgba(52, 168, 83, .15); color: #5bb974; border: 1px solid rgba(52, 168, 83, .35); }
+.lab-badge.meta-ai { background: rgba(0, 129, 251, .15); color: #4da3ff; border: 1px solid rgba(0, 129, 251, .35); }
+
+.official-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+.official-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-direction: column; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.official-card:hover { border-color: #3e4c5f; box-shadow: 0 4px 16px rgba(0, 0, 0, .2); }
+.official-card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.official-cat { font-size: 11px; color: var(--muted); background: var(--panel-2); padding: 2px 7px; border-radius: 4px; }
+.official-card-time { margin-left: auto; font-size: 12px; color: var(--muted); }
+.official-card-title { font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text); margin-bottom: 6px; }
+.official-card-title a { color: inherit; text-decoration: none; }
+.official-card-title a:hover { color: var(--accent-2); text-decoration: underline; }
+.official-card-en { font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.official-card-summary { font-size: 13px; line-height: 1.55; color: #c9d1d9; background: rgba(255, 255, 255, .02); border: 1px solid rgba(255, 255, 255, .05); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; flex: 1; }
+.official-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: auto; }
+.official-card-actions { display: flex; gap: 6px; align-items: center; }
+
 /* ---------- Mobile & Small Screen Optimization ---------- */
 @media (max-width: 768px) {
   html, body { height: auto; min-height: 100%; overflow-x: hidden; }
@@ -236,23 +272,24 @@ body.drawer-open .drawer-mask { opacity: 1; pointer-events: auto; }
     background: rgba(21, 27, 35, 0.96);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px));
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom, 0px));
     z-index: 19;
   }
   .sidebar .brand, .sidebar .sidebar-foot { display: none; }
-  .sidebar nav { flex-direction: row; width: 100%; justify-content: space-around; gap: 2px; }
+  .sidebar nav { flex-direction: row; width: 100%; justify-content: space-around; gap: 1px; }
   .sidebar nav a {
     flex: 1;
     flex-direction: column;
     gap: 2px;
-    padding: 6px 2px;
-    font-size: 11px;
+    padding: 5px 1px;
+    font-size: 10.5px;
     text-align: center;
     justify-content: center;
     position: relative;
-    border-radius: 8px;
+    border-radius: 6px;
+    min-width: 0;
   }
-  .sidebar nav .ico { font-size: 16px; width: auto; line-height: 1.1; }
+  .sidebar nav .ico { font-size: 15px; width: auto; line-height: 1.1; }
   .sidebar nav .badge {
     position: absolute;
     top: 2px;
@@ -372,5 +409,17 @@ body.drawer-open .drawer-mask { opacity: 1; pointer-events: auto; }
   /* Toasts above bottom nav */
   .toasts { left: 12px; right: 12px; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
   .toast { max-width: none; width: 100%; }
+
+  /* Official Blogs Mobile Layout */
+  .official-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .official-header .row { width: 100%; }
+  .official-header #official-search { width: 100% !important; }
+  .lab-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .lab-tabs::-webkit-scrollbar { display: none; }
+  .lab-tab { flex-shrink: 0; font-size: 12px; padding: 5px 10px; }
+  .official-grid { grid-template-columns: 1fr; gap: 12px; }
+  .official-card { padding: 14px; }
+  .official-card-title { font-size: 14.5px; }
+  .official-card-actions .btn { padding: 5px 8px; font-size: 11px; }
 }
 
