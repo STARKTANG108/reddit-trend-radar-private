@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reddit 热帖雷达</title>
+  <link rel="stylesheet" href="static/style.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div>
+        <div class="brand-name">热帖雷达</div>
+        <div class="brand-sub">Reddit → X</div>
+      </div>
+    </div>
+    <nav>
+      <a href="#/dashboard" data-route="dashboard"><span class="ico">◧</span>仪表盘</a>
+      <a href="#/radar" data-route="radar"><span class="ico">◎</span>热帖雷达</a>
+      <a href="#/queue" data-route="queue"><span class="ico">✎</span>二创文案<span class="badge" id="nav-pending"></span></a>
+      <a href="#/subs" data-route="subs"><span class="ico">≡</span>社区管理</a>
+      <a href="#/settings" data-route="settings"><span class="ico">⚙</span>设置</a>
+    </nav>
+    <div class="sidebar-foot" id="mode-pills"></div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <h1 id="page-title"></h1>
+      <div class="topbar-right" id="budget-mini"></div>
+    </header>
+    <section id="view"></section>
+  </main>
+  <div class="drawer-mask" id="drawer-mask"></div>
+  <aside class="drawer" id="drawer"></aside>
+  <div class="toasts" id="toasts"></div>
+  <script src="static/charts.js"></script>
+  <script src="static/studio.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>

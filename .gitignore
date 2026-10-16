@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+data/cache/
+data/media/
+data/radar.db-shm
+data/radar.db-wal
+.DS_Store
