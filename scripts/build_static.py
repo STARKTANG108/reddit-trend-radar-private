@@ -46,11 +46,16 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
         shutil.move(git_backup, dist / ".git")
     shutil.copytree(ROOT / "app" / "static", dist / "static")
 
-    # Write index.html with window.RADAR_STATIC = true injected
+    # Write index.html with window.RADAR_STATIC = true injected and cache-busting asset versions
+    v = int(now)
     idx_html = (ROOT / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    idx_html = idx_html.replace('href="static/style.css"', f'href="static/style.css?v={v}"')
+    idx_html = idx_html.replace('src="static/charts.js"', f'src="static/charts.js?v={v}"')
+    idx_html = idx_html.replace('src="static/studio.js"', f'src="static/studio.js?v={v}"')
+    idx_html = idx_html.replace('src="static/app.js"', f'src="static/app.js?v={v}"')
     idx_html = idx_html.replace(
-        '<script src="static/charts.js"></script>',
-        '<script>window.RADAR_STATIC = true;</script>\n  <script src="static/charts.js"></script>',
+        f'<script src="static/charts.js?v={v}"></script>',
+        f'<script>window.RADAR_STATIC = true;</script>\n  <script src="static/charts.js?v={v}"></script>',
     )
     (dist / "index.html").write_text(idx_html, encoding="utf-8")
     (dist / ".nojekyll").write_text("", encoding="utf-8")

@@ -99,6 +99,8 @@ def overview():
         used_today = row(c, "SELECT COUNT(*) n FROM tweets WHERE status='used' AND used_at >= ?", (today,))["n"]
         top = rows(c, """SELECT * FROM posts WHERE status IN ('tracking','candidate','drafted') AND created_utc >= ?
                          ORDER BY hot_score DESC LIMIT 8""", (int(now - get_settings()["candidate_max_age_hours"] * 3600),))
+        latest = rows(c, """SELECT * FROM posts WHERE status IN ('tracking','candidate','drafted')
+                            ORDER BY created_utc DESC LIMIT 8""")
     return {
         "budget": budget.status(),
         "counts": counts,
@@ -108,6 +110,7 @@ def overview():
         "new_today": new_today,
         "spam_today": spam_today,
         "top": [_post_view(p, now) for p in top],
+        "latest": [_post_view(p, now) for p in latest],
     }
 
 

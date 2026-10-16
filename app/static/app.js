@@ -57,7 +57,10 @@ async function _staticApi(path, opts = {}) {
       const posts = (b.posts || []).map(applyPost);
       const tweets = (b.tweets || []).map(applyTweet);
       const pending = new Set(tweets.filter((t) => t.status === "draft").map((t) => t.post_id)).size;
-      return { ...b.overview, pending_review: pending, top: (b.overview.top || []).map(applyPost) };
+      const valid = posts.filter((p) => ["tracking", "candidate", "drafted"].includes(p.status));
+      const latest = [...valid].sort((x, y) => y.created_utc - x.created_utc).slice(0, 8);
+      const top = [...valid].sort((x, y) => y.hot_score - x.hot_score).slice(0, 8);
+      return { ...b.overview, pending_review: pending, top, latest };
     }
     if (pathname === "/usage") return b.usage;
     if (pathname === "/estimate") return b.estimate;
@@ -270,7 +273,16 @@ async function renderDashboard(view) {
       <div class="card kpi"><div class="label">待使用文案</div><div class="value">${ov.pending_review}</div><div class="hint">今日已使用 ${ov.used_today} 条</div></div>
     </div>
     <div class="grid cols-2" style="margin-top:16px">
-      <div class="card"><h3>最近 ${settings.candidate_max_age_hours} 小时内最热 <small>按评论热度</small><a href="#/radar" class="muted" style="font-weight:400;font-size:12px">查看全部 →</a></h3><div id="top-list"></div></div>
+      <div class="card">
+        <h3>
+          <span style="display:inline-flex;gap:6px">
+            <button class="btn sm" id="tab-latest" style="padding:3px 9px;font-size:12px;font-weight:600">⚡ 最新收录新帖</button>
+            <button class="btn sm ghost" id="tab-top" style="padding:3px 9px;font-size:12px">🔥 爆款热度榜</button>
+          </span>
+          <a href="#/radar" class="muted" style="font-weight:400;font-size:12px">查看全部 →</a>
+        </h3>
+        <div id="top-list"></div>
+      </div>
       <div class="card"><h3>后台任务 <small>自动定时执行</small></h3><div id="jobs"></div></div>
     </div>
     <div class="grid cols-2" style="margin-top:16px">
@@ -287,17 +299,32 @@ async function renderDashboard(view) {
       </div>
     </div>`;
   $("#see-spam").addEventListener("click", () => { Object.assign(radarFilter, { status: "spam", max_age_hours: 24, sort: "new" }); });
-  $("#top-list").innerHTML = ov.top.length
-    ? ov.top.map((p) => `
-      <div class="list-item" data-id="${p.id}">
-        <div class="score-ring" style="border:2px solid ${hotColor(p.hot_score)};color:${hotColor(p.hot_score)}">${Math.round(p.hot_score)}</div>
-        <div class="main"><div class="t">${esc(p.title_zh || p.title)}</div>
-          ${p.title_zh ? `<div class="m" style="opacity:0.78">${esc(p.title)}</div>` : ""}
-          <div class="m"><span class="sub-tag">r/${esc(p.subreddit)}</span> · ${postTime(p)} · 评论 <b>${fmtNum(p.num_comments)}</b> · ${p.comment_velocity} 条/分钟</div></div>
-        ${statusTag(p.status)}
-      </div>`).join("")
-    : '<div class="empty">暂无数据，等待首次采集…</div>';
-  $$("#top-list .list-item").forEach((n) => n.addEventListener("click", () => openPost(n.dataset.id)));
+  const renderList = (items) => {
+    const box = $("#top-list");
+    if (!box) return;
+    box.innerHTML = items && items.length
+      ? items.map((p) => `
+        <div class="list-item" data-id="${p.id}">
+          <div class="score-ring" style="border:2px solid ${hotColor(p.hot_score)};color:${hotColor(p.hot_score)}">${Math.round(p.hot_score)}</div>
+          <div class="main"><div class="t">${esc(p.title_zh || p.title)}</div>
+            ${p.title_zh ? `<div class="m" style="opacity:0.78">${esc(p.title)}</div>` : ""}
+            <div class="m"><span class="sub-tag">r/${esc(p.subreddit)}</span> · ${postTime(p)} · 评论 <b>${fmtNum(p.num_comments)}</b> · ${p.comment_velocity} 条/分钟</div></div>
+          ${statusTag(p.status)}
+        </div>`).join("")
+      : '<div class="empty">暂无数据，等待首次采集…</div>';
+    $$("#top-list .list-item").forEach((n) => n.addEventListener("click", () => openPost(n.dataset.id)));
+  };
+  renderList(ov.latest && ov.latest.length ? ov.latest : ov.top);
+  $("#tab-latest").addEventListener("click", () => {
+    $("#tab-latest").className = "btn sm";
+    $("#tab-top").className = "btn sm ghost";
+    renderList(ov.latest || []);
+  });
+  $("#tab-top").addEventListener("click", () => {
+    $("#tab-latest").className = "btn sm ghost";
+    $("#tab-top").className = "btn sm";
+    renderList(ov.top || []);
+  });
   renderJobs();
   Charts.stackedBar($("#usage-chart"), {
     labels: usage.days.map((d) => d.date),
@@ -330,7 +357,7 @@ async function renderJobs() {
 }
 
 // ---------- radar ----------
-const radarFilter = { status: "tracking,candidate,drafted", subreddit: "", sort: "hot", q: "", max_age_hours: 12 };
+const radarFilter = { status: "tracking,candidate,drafted", subreddit: "", sort: "new", q: "", max_age_hours: 24 };
 
 async function renderRadar(view) {
   refreshShell();
@@ -348,7 +375,7 @@ async function renderRadar(view) {
         <option value="">全部</option>
       </select>
       <select id="f-sub"><option value="">全部社区</option>${subs.map((s) => `<option value="${esc(s.name)}">r/${esc(s.name)}</option>`).join("")}</select>
-      <select id="f-sort"><option value="hot">按爆款热度</option><option value="new">按发帖时间（最新）</option><option value="comments">按评论数</option></select>
+      <select id="f-sort"><option value="new">按发帖时间（最新）</option><option value="hot">按爆款热度</option><option value="comments">按评论数</option></select>
       <select id="f-age"><option value="1">1 小时内</option><option value="3">3 小时内</option><option value="6">6 小时内</option><option value="12">12 小时内</option><option value="24">24 小时内</option><option value="72">3 天内</option></select>
       <input type="text" id="f-q" placeholder="搜索中英文标题…" style="width:200px" />
       <div class="spacer"></div>
