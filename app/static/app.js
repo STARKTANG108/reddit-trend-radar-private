@@ -356,7 +356,7 @@ async function renderRadar(view) {
       <span class="muted" id="radar-count"></span>
       <button class="btn" id="radar-refresh">刷新</button>
     </div>
-    <div class="card" style="padding:0;overflow:auto"><table>
+    <div class="card" style="padding:0;overflow:auto"><table class="radar-table">
       <thead><tr><th style="width:130px">爆款热度</th><th>标题（中文翻译 / 原文）</th><th style="width:150px">发帖时间</th><th class="num">评论</th><th class="num">评论/分钟</th><th class="num">赞</th><th>状态</th></tr></thead>
       <tbody id="radar-body"></tbody></table></div>`;
   $("#f-status").value = radarFilter.status;
@@ -380,16 +380,16 @@ async function loadRadar() {
   body.innerHTML = items.length
     ? items.map((p) => `
       <tr data-id="${p.id}">
-        <td>${p.status === "spam" ? '<span class="muted">—</span>' : hotBar(p.hot_score)}</td>
+        <td class="cell-hot">${p.status === "spam" ? '<span class="muted">—</span>' : hotBar(p.hot_score)}</td>
         <td class="title-cell"><span class="t">${p.images.length ? '<span class="img-dot" title="原帖带图">图</span>' : ""}${esc(p.title_zh || p.title)}</span>
-          ${p.title_zh ? `<div class="m" style="opacity:0.78">${esc(p.title)}</div>` : ""}
+          ${p.title_zh ? `<div class="m en-sub" style="opacity:0.78">${esc(p.title)}</div>` : ""}
           <div class="m"><span class="sub-tag">r/${esc(p.subreddit)}</span> · ${TYPE[p.post_type] || p.post_type}${p.flair ? " · " + esc(p.flair) : ""} · u/${esc(p.author)}
           ${p.spam_reason ? ` · <span style="color:var(--red)">${esc(p.spam_reason)}</span>` : ""}</div></td>
-        <td>${postTime(p)}</td>
-        <td class="num"><b>${fmtNum(p.num_comments)}</b></td>
-        <td class="num">${p.comment_velocity}</td>
-        <td class="num muted">${fmtNum(p.score)}</td>
-        <td>${statusTag(p.status)}</td>
+        <td class="cell-time">${postTime(p)}</td>
+        <td class="num cell-cmt" data-label="评论 "><b>${fmtNum(p.num_comments)}</b></td>
+        <td class="num cell-vel" data-label="增速 ">${p.comment_velocity}/m</td>
+        <td class="num muted cell-score" data-label="赞 ">${fmtNum(p.score)}</td>
+        <td class="cell-status">${statusTag(p.status)}</td>
       </tr>`).join("")
     : `<tr><td colspan="7" class="empty">没有符合条件的帖子</td></tr>`;
   $$("tr[data-id]", body).forEach((tr) => tr.addEventListener("click", () => openPost(tr.dataset.id)));
@@ -582,7 +582,7 @@ async function renderSubs(view) {
   const subs = await api("/subreddits");
   view.innerHTML = `
     <div class="card" style="margin-bottom:16px"><div class="row">
-      <input type="text" id="sub-name" placeholder="输入社区名，例如 LocalLLaMA 或 r/technology" style="width:340px" />
+      <input type="text" id="sub-name" placeholder="输入社区名，例如 LocalLLaMA 或 r/technology" style="flex:1;min-width:180px;max-width:340px" />
       <button class="btn primary" id="sub-add">添加社区</button>
       <span class="muted">所有启用的社区每 20 个合并成一次 <code>/r/a+b+c/new</code> 请求，增加社区几乎不增加调用。</span>
     </div></div>
