@@ -33,9 +33,17 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
 
     now = time.time()
     dist = ROOT / "dist"
+    git_backup = None
+    if (dist / ".git").exists():
+        git_backup = ROOT / ".dist_git_tmp"
+        if git_backup.exists():
+            shutil.rmtree(git_backup)
+        shutil.move(dist / ".git", git_backup)
     if dist.exists():
         shutil.rmtree(dist)
     dist.mkdir(parents=True, exist_ok=True)
+    if git_backup and git_backup.exists():
+        shutil.move(git_backup, dist / ".git")
     shutil.copytree(ROOT / "app" / "static", dist / "static")
 
     # Write index.html with window.RADAR_STATIC = true injected
@@ -96,11 +104,14 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
 
 
 def push_gh_pages(dist: Path | None = None) -> bool:
+    import os
     import subprocess
 
     dist = dist or (ROOT / "dist")
     if not dist.exists():
         return False
+    git_dir = dist / ".git"
+    env = {**os.environ, "GIT_DIR": str(git_dir), "GIT_WORK_TREE": str(dist)}
     try:
         out = subprocess.check_output(
             ["git", "credential-osxkeychain", "get"],
@@ -117,15 +128,16 @@ def push_gh_pages(dist: Path | None = None) -> bool:
         if token
         else "https://github.com/STARKTANG108/reddit-trend-radar.git"
     )
-    subprocess.run(["git", "init", "-b", "gh-pages"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "config", "user.name", "STARKTANG108"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "STARKTANG108@users.noreply.github.com"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "commit", "-m", f"chore: auto-refresh radar ({int(time.time())})"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "remote", "remove", "origin"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "remote", "add", "origin", remote], cwd=dist, check=False, capture_output=True)
-    r = subprocess.run(["git", "push", "-u", "origin", "gh-pages", "--force"], cwd=dist, check=False, capture_output=True)
-    subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/STARKTANG108/reddit-trend-radar.git"], cwd=dist, check=False, capture_output=True)
+    if not git_dir.exists():
+        subprocess.run(["git", "init", "-b", "gh-pages", str(dist)], check=False, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "STARKTANG108"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "STARKTANG108@users.noreply.github.com"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "add", "-A"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "commit", "-m", f"chore: auto-refresh radar ({int(time.time())})"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "remove", "origin"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", remote], env=env, check=False, capture_output=True)
+    r = subprocess.run(["git", "push", "-u", "origin", "gh-pages", "--force"], env=env, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/STARKTANG108/reddit-trend-radar.git"], env=env, check=False, capture_output=True)
     return r.returncode == 0
 
 
