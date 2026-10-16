@@ -22,10 +22,10 @@ const IS_STATIC = Boolean(window.RADAR_STATIC || location.hostname.endsWith(".gi
 const proxied = (u) => (IS_STATIC ? "https://wsrv.nl/?url=" + encodeURIComponent(u) : "/api/image-proxy?url=" + encodeURIComponent(u));
 
 let _bundleCache = { ts: 0, data: null };
-async function _getStaticBundle() {
+async function _getStaticBundle(force = false) {
   const now = Date.now();
-  if (!_bundleCache.data || now - _bundleCache.ts > 60000) {
-    const r = await fetch(`static-bundle.json?t=${Math.floor(now / 60000)}`);
+  if (force || !_bundleCache.data || now - _bundleCache.ts > 15000) {
+    const r = await fetch(`static-bundle.json?t=${now}`, { cache: "no-store" });
     if (!r.ok) throw new Error("静态数据包加载失败");
     _bundleCache = { ts: now, data: await r.json() };
   }
@@ -40,7 +40,7 @@ function _saveOverrides(ov) {
 }
 
 async function _staticApi(path, opts = {}) {
-  const b = await _getStaticBundle();
+  const b = await _getStaticBundle(opts.force);
   const ov = _localOverrides();
   const tweetOv = ov.tweets || {};
   const postOv = ov.posts || {};
@@ -353,6 +353,7 @@ async function renderRadar(view) {
       <input type="text" id="f-q" placeholder="搜索中英文标题…" style="width:200px" />
       <div class="spacer"></div>
       <span class="legend-fresh"><i class="fresh-1"></i>1h 内 <i class="fresh-2"></i>1-3h <i class="fresh-3"></i>3h+</span>
+      <span id="radar-sync-time" class="pill ok"><span class="dot"></span>自动同步中</span>
       <span class="muted" id="radar-count"></span>
       <button class="btn" id="radar-refresh">刷新</button>
     </div>
@@ -366,17 +367,33 @@ async function renderRadar(view) {
   $("#f-q").value = radarFilter.q;
   const bind = (id, key) => $(id).addEventListener(id === "#f-q" ? "input" : "change", (e) => { radarFilter[key] = e.target.value; loadRadar(); });
   bind("#f-status", "status"); bind("#f-sub", "subreddit"); bind("#f-sort", "sort"); bind("#f-age", "max_age_hours"); bind("#f-q", "q");
-  $("#radar-refresh").addEventListener("click", loadRadar);
-  await loadRadar();
-  state.timer = setInterval(loadRadar, 30000);
+  $("#radar-refresh").addEventListener("click", async () => {
+    const btn = $("#radar-refresh");
+    btn.disabled = true;
+    btn.textContent = "刷新中…";
+    try {
+      await loadRadar(true);
+      toast("已同步最新数据", "ok");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "刷新";
+    }
+  });
+  await loadRadar(true);
+  state.timer = setInterval(() => loadRadar(true), 30000);
 }
 
-async function loadRadar() {
+async function loadRadar(force = false) {
   const qs = new URLSearchParams({ ...radarFilter, limit: 300 }).toString();
-  const items = await api("/posts?" + qs);
+  const items = await api("/posts?" + qs, { force });
   const body = $("#radar-body");
   if (!body) return;
   $("#radar-count").textContent = `${items.length} 条`;
+  const syncTag = $("#radar-sync-time");
+  if (syncTag) {
+    const nowTime = new Date().toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    syncTag.innerHTML = `<span class="dot"></span>${nowTime} 已同步`;
+  }
   body.innerHTML = items.length
     ? items.map((p) => `
       <tr data-id="${p.id}">

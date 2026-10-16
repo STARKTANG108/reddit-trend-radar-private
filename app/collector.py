@@ -65,6 +65,23 @@ def collect_new(client) -> dict:
             tracking_known = {r["id"] for r in known_rows if r["tracking"]}
             fresh = [p for p in items if p["id"] not in known and not p["removed"]]
             piggybacked.extend(p for p in items if p["id"] in tracking_known and not p["removed"])
+            removed_unknown = [p for p in items if p["id"] not in known and p["removed"]]
+            if removed_unknown:
+                with tx() as c:
+                    c.executemany(
+                        """INSERT OR IGNORE INTO posts(id, subreddit, title, selftext, author, url, permalink, post_type, flair, over_18,
+                           created_utc, first_seen, last_checked, next_check, tracking, score, num_comments, upvote_ratio, images, status, spam_reason)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,0,?,?,?,?, 'removed', 'removed')""",
+                        [
+                            (
+                                p["id"], p["subreddit"], p["title"], "", p.get("author") or "", p.get("url") or "",
+                                p.get("permalink") or "", p.get("post_type") or "text", p.get("flair"), p.get("over_18", 0),
+                                p["created_utc"], int(now), int(now), p.get("score", 0), p.get("num_comments", 0),
+                                p.get("upvote_ratio", 0.0), "[]",
+                            )
+                            for p in removed_unknown
+                        ],
+                    )
             new_posts += fresh
             # stop once we overlap with already-known posts, or on the very first run
             if not after or len(fresh) < len(items) or not has_history:

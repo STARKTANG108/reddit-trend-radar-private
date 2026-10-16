@@ -254,7 +254,11 @@ class RedditDateClient:
         if not subs:
             return [], None
         if len(subs) == 1:
-            params: dict = {"limit": min(limit, 50), "sort": "new"}
+            import random
+
+            # Vary limit dynamically to bypass redditdate.top server-side stale cache on fixed limit=25
+            req_limit = random.choice([28, 29, 31, 32, 33, 34, 35]) if (limit == 25 and not after) else min(limit, 50)
+            params: dict = {"limit": req_limit, "sort": "new"}
             if after:
                 params["after"] = int(after)
             payload = self._get(f"/v1/subreddits/{subs[0]}/posts", params, "new", "normal")
