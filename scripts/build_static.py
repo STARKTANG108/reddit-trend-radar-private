@@ -29,7 +29,7 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
         if promoted:
             pipeline.process_candidates()
         if config.LLM_CONFIGURED:
-            pipeline.translate_missing_titles(60)
+            pipeline.translate_missing_titles(100)
         try:
             official.collect_all()
             if config.LLM_CONFIGURED:

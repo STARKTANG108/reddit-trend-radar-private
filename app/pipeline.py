@@ -98,14 +98,14 @@ def translate_post(post_id: str) -> dict:
     return {"post_id": post_id, "title_zh": title_zh or post.get("title_zh"), "selftext_zh": selftext_zh or post.get("selftext_zh")}
 
 
-def translate_missing_titles(limit: int = 40) -> int:
+def translate_missing_titles(limit: int = 100) -> int:
     with tx() as c:
         missing = [
             dict(r)
             for r in c.execute(
                 """SELECT id, subreddit, title FROM posts
                    WHERE status IN ('tracking','candidate','drafted') AND (title_zh IS NULL OR title_zh = '')
-                   ORDER BY hot_score DESC, created_utc DESC LIMIT ?""",
+                   ORDER BY created_utc DESC, hot_score DESC LIMIT ?""",
                 (limit,),
             )
         ]

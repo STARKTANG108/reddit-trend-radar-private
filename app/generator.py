@@ -222,12 +222,12 @@ def translate_post_content(post: dict) -> tuple[str, str]:
 
 
 def translate_titles_batch(items: list[dict]) -> dict[str, str]:
-    """Batch-translate post titles into Chinese in chunks of up to 20 posts per LLM call."""
+    """Batch-translate post titles into Chinese in chunks of up to 15 posts per LLM call."""
     if not config.LLM_CONFIGURED or not items:
         return {}
     out: dict[str, str] = {}
-    for i in range(0, len(items), 20):
-        chunk = items[i : i + 20]
+    for i in range(0, len(items), 15):
+        chunk = items[i : i + 15]
         lines = "\n".join(f'{p["id"]}: [r/{p.get("subreddit", "")}] {p["title"]}' for p in chunk)
         messages = [
             {
@@ -244,9 +244,15 @@ def translate_titles_batch(items: list[dict]) -> dict[str, str]:
             data = _call_llm(messages, temperature=0.2, timeout=60.0)
             if isinstance(data, dict):
                 for k, v in data.items():
-                    if isinstance(v, str) and v.strip():
-                        out[str(k)] = v.strip()
-        except Exception:
+                    val = ""
+                    if isinstance(v, str):
+                        val = v.strip()
+                    elif isinstance(v, dict):
+                        val = (v.get("title_zh") or v.get("zh") or v.get("title") or "").strip()
+                    if val:
+                        out[str(k)] = val
+        except Exception as e:
+            log.warning("translate_titles_batch chunk %d-%d failed: %s", i, i + len(chunk), e)
             continue
     return out
 
