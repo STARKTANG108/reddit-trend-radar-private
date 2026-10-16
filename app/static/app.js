@@ -58,8 +58,8 @@ async function _staticApi(path, opts = {}) {
       const tweets = (b.tweets || []).map(applyTweet);
       const pending = new Set(tweets.filter((t) => t.status === "draft").map((t) => t.post_id)).size;
       const valid = posts.filter((p) => ["tracking", "candidate", "drafted"].includes(p.status));
-      const latest = [...valid].sort((x, y) => y.created_utc - x.created_utc).slice(0, 8);
-      const top = [...valid].sort((x, y) => y.hot_score - x.hot_score).slice(0, 8);
+      const latest = [...valid].sort((x, y) => y.created_utc - x.created_utc).slice(0, 10);
+      const top = [...valid].sort((x, y) => (y.hot_score || 0) - (x.hot_score || 0)).slice(0, 10);
       return { ...b.overview, pending_review: pending, top, latest };
     }
     if (pathname === "/usage") return b.usage;
@@ -275,9 +275,9 @@ async function renderDashboard(view) {
     <div class="grid cols-2" style="margin-top:16px">
       <div class="card">
         <h3>
-          <span style="display:inline-flex;gap:6px">
-            <button class="btn sm" id="tab-latest" style="padding:3px 9px;font-size:12px;font-weight:600">⚡ 最新收录新帖</button>
-            <button class="btn sm ghost" id="tab-top" style="padding:3px 9px;font-size:12px">🔥 爆款热度榜</button>
+          <span style="display:inline-flex;gap:6px;align-items:center">
+            <button class="btn sm" id="tab-top" style="padding:4px 10px;font-size:12px;font-weight:600">🔥 热帖评分榜 TOP 10</button>
+            <button class="btn sm ghost" id="tab-latest" style="padding:4px 10px;font-size:12px">⚡ 最新收录新帖 TOP 10</button>
           </span>
           <a href="#/radar" class="muted" style="font-weight:400;font-size:12px">查看全部 →</a>
         </h3>
@@ -299,31 +299,36 @@ async function renderDashboard(view) {
       </div>
     </div>`;
   $("#see-spam").addEventListener("click", () => { Object.assign(radarFilter, { status: "spam", max_age_hours: 24, sort: "new" }); });
+  const rankBadge = (idx) => {
+    const cls = idx === 0 ? "rank-1" : idx === 1 ? "rank-2" : idx === 2 ? "rank-3" : "rank-n";
+    return `<span class="rank-badge ${cls}">${idx + 1}</span>`;
+  };
   const renderList = (items) => {
     const box = $("#top-list");
     if (!box) return;
     box.innerHTML = items && items.length
-      ? items.map((p) => `
+      ? items.slice(0, 10).map((p, idx) => `
         <div class="list-item" data-id="${p.id}">
-          <div class="score-ring" style="border:2px solid ${hotColor(p.hot_score)};color:${hotColor(p.hot_score)}">${Math.round(p.hot_score)}</div>
+          ${rankBadge(idx)}
+          <div class="score-ring" style="border:2px solid ${hotColor(p.hot_score)};color:${hotColor(p.hot_score)}" title="热度评分: ${Math.round(p.hot_score)} 分">${Math.round(p.hot_score)}</div>
           <div class="main"><div class="t">${esc(p.title_zh || p.title)}</div>
             ${p.title_zh ? `<div class="m" style="opacity:0.78">${esc(p.title)}</div>` : ""}
-            <div class="m"><span class="sub-tag">r/${esc(p.subreddit)}</span> · ${postTime(p)} · 评论 <b>${fmtNum(p.num_comments)}</b> · ${p.comment_velocity} 条/分钟</div></div>
+            <div class="m"><span class="sub-tag">r/${esc(p.subreddit)}</span> · ${postTime(p)} · 评分 <b>${Math.round(p.hot_score)}</b> · 评论 <b>${fmtNum(p.num_comments)}</b> · ${p.comment_velocity} 条/分 · 赞 <b>${fmtNum(p.score)}</b></div></div>
           ${statusTag(p.status)}
         </div>`).join("")
       : '<div class="empty">暂无数据，等待首次采集…</div>';
     $$("#top-list .list-item").forEach((n) => n.addEventListener("click", () => openPost(n.dataset.id)));
   };
-  renderList(ov.latest && ov.latest.length ? ov.latest : ov.top);
-  $("#tab-latest").addEventListener("click", () => {
-    $("#tab-latest").className = "btn sm";
-    $("#tab-top").className = "btn sm ghost";
-    renderList(ov.latest || []);
-  });
+  renderList(ov.top && ov.top.length ? ov.top : ov.latest);
   $("#tab-top").addEventListener("click", () => {
-    $("#tab-latest").className = "btn sm ghost";
     $("#tab-top").className = "btn sm";
+    $("#tab-latest").className = "btn sm ghost";
     renderList(ov.top || []);
+  });
+  $("#tab-latest").addEventListener("click", () => {
+    $("#tab-top").className = "btn sm ghost";
+    $("#tab-latest").className = "btn sm";
+    renderList(ov.latest || []);
   });
   renderJobs();
   Charts.stackedBar($("#usage-chart"), {

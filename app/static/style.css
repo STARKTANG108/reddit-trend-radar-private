@@ -141,6 +141,11 @@ th.num { text-align: right; }
 .list-item .main { flex: 1; min-width: 0; }
 .list-item .main .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-item .main .m { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.rank-badge { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; line-height: 1; }
+.rank-badge.rank-1 { background: #ff5a1f; color: #fff; box-shadow: 0 0 6px rgba(255, 90, 31, .4); }
+.rank-badge.rank-2 { background: #f0883e; color: #fff; }
+.rank-badge.rank-3 { background: #d29922; color: #fff; }
+.rank-badge.rank-n { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
 .score-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
 
 .job { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
