@@ -27,9 +27,19 @@ else:
     client = RedditClient()
 
 
+def _sync_gh_pages() -> None:
+    try:
+        from scripts.build_static import build
+
+        build(skip_fetch=True, push=True)
+    except Exception as e:
+        log.warning("gh-pages sync skipped: %s", e)
+
+
 def _refresh() -> dict:
     out = collector.refresh_due(client)
     out["candidates"] = pipeline.process_candidates()
+    threading.Thread(target=_sync_gh_pages, daemon=True).start()
     return out
 
 
@@ -38,6 +48,7 @@ def _collect() -> dict:
     out["candidates"] = pipeline.process_candidates()
     if config.LLM_CONFIGURED:
         out["translated"] = pipeline.translate_missing_titles(40)
+    threading.Thread(target=_sync_gh_pages, daemon=True).start()
     return out
 
 

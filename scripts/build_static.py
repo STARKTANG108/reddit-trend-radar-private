@@ -15,7 +15,7 @@ from app.db import row, rows, tx  # noqa: E402
 from app.generator import weighted_len  # noqa: E402
 
 
-def build(skip_fetch: bool = False) -> None:
+def build(skip_fetch: bool = False, push: bool = False) -> None:
     main._bootstrap()
     db.update_settings({"poll_new_minutes": 20, "refresh_check_minutes": 20, "candidate_max_age_hours": 12, "min_comments": 5})
 
@@ -90,14 +90,45 @@ def build(skip_fetch: bool = False) -> None:
     }
     (dist / "static-bundle.json").write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
 
-    # Persist radar.db inside dist/.state/radar.db so GitHub Actions can restore state across 20-min runs
-    state_dir = dist / ".state"
-    state_dir.mkdir(parents=True, exist_ok=True)
-    if config.DB_PATH.exists():
-        shutil.copy2(config.DB_PATH, state_dir / "radar.db")
-
     print(f"Static build complete: {len(all_posts)} posts, {len(bundle['tweets'])} tweets -> {dist}")
+    if push:
+        push_gh_pages(dist)
+
+
+def push_gh_pages(dist: Path | None = None) -> bool:
+    import subprocess
+
+    dist = dist or (ROOT / "dist")
+    if not dist.exists():
+        return False
+    try:
+        out = subprocess.check_output(
+            ["git", "credential-osxkeychain", "get"],
+            input="protocol=https\nhost=github.com\n\n",
+            text=True,
+            timeout=5,
+        )
+        creds = dict(line.split("=", 1) for line in out.strip().splitlines() if "=" in line)
+        token = creds.get("password", "")
+    except Exception:
+        token = ""
+    remote = (
+        f"https://x-access-token:{token}@github.com/STARKTANG108/reddit-trend-radar.git"
+        if token
+        else "https://github.com/STARKTANG108/reddit-trend-radar.git"
+    )
+    subprocess.run(["git", "init", "-b", "gh-pages"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "STARKTANG108"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "STARKTANG108@users.noreply.github.com"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "commit", "-m", f"chore: auto-refresh radar ({int(time.time())})"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "remove", "origin"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", remote], cwd=dist, check=False, capture_output=True)
+    r = subprocess.run(["git", "push", "-u", "origin", "gh-pages", "--force"], cwd=dist, check=False, capture_output=True)
+    subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/STARKTANG108/reddit-trend-radar.git"], cwd=dist, check=False, capture_output=True)
+    return r.returncode == 0
 
 
 if __name__ == "__main__":
-    build(skip_fetch="--skip-fetch" in sys.argv)
+    build(skip_fetch="--skip-fetch" in sys.argv, push="--push" in sys.argv)
+
