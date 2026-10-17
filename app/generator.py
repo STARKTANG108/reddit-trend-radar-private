@@ -3,12 +3,15 @@ from __future__ import annotations
 import html
 import ipaddress
 import json
+import logging
 import re
 from urllib.parse import urlparse
 
 import httpx
 
 from . import config
+
+log = logging.getLogger("radar.generator")
 
 MAX_WEIGHT = 280
 URL_WEIGHT = 23
@@ -102,7 +105,25 @@ def _parse_llm_json(raw_text: str) -> dict:
     cleaned = _THINK_RE.sub("", raw_text or "").strip()
     cleaned = _FENCE_RE.sub("", cleaned).strip()
     m = re.search(r"\{[\s\S]*\}", cleaned)
-    return json.loads(m.group(0) if m else cleaned)
+    target = m.group(0) if m else cleaned
+    try:
+        return json.loads(target)
+    except Exception:
+        try:
+            return json.loads(target, strict=False)
+        except Exception:
+            pass
+    fixed = re.sub(r",\s*\}", "}", target)
+    try:
+        return json.loads(fixed, strict=False)
+    except Exception:
+        pass
+    pairs = {}
+    for k, v in re.findall(r'"([a-zA-Z0-9_]+)"\s*:\s*"(.*?)"(?=\s*,\s*"[a-zA-Z0-9_]+"|\s*\})', target, re.DOTALL):
+        pairs[k] = v.strip()
+    if pairs:
+        return pairs
+    return json.loads(target)
 
 
 def _call_llm(messages: list[dict], temperature: float = 0.7, timeout: float = 90.0) -> dict:

@@ -40,7 +40,12 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_SUBREDDITS = [
-    s for s in _env("DEFAULT_SUBREDDITS", "Codex,Claude,Anthropic,GeminiAI,OpenAI,google_antigravity").split(",") if s
+    s
+    for s in _env(
+        "DEFAULT_SUBREDDITS",
+        "Codex,Claude,ClaudeAI,Anthropic,GeminiAI,OpenAI,google_antigravity,LocalLLaMA,singularity,DeepSeek,vibecoding,ChatGPTCoding",
+    ).split(",")
+    if s
 ]
 
 _demo = _env("DEMO_MODE", "auto").lower()
