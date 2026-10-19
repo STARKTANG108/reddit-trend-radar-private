@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -8,7 +10,9 @@ from urllib.parse import urlparse
 import httpx
 
 from . import budget, config
-from .db import rows, tx
+from .db import row, rows, tx
+
+log = logging.getLogger(__name__)
 
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 
@@ -279,7 +283,7 @@ class RedditDateClient:
             return []
         marks = ",".join("?" * len(post_ids))
         with tx() as c:
-            targets = rows(c, f"SELECT id, subreddit, created_utc FROM posts WHERE id IN ({marks})", post_ids)
+            targets = rows(c, f"SELECT id, subreddit, created_utc, hot_score, score, status FROM posts WHERE id IN ({marks})", post_ids)
         by_sub: dict[str, list[dict]] = defaultdict(list)
         for t in targets:
             by_sub[t["subreddit"]].append(t)
@@ -294,16 +298,57 @@ class RedditDateClient:
                 else:
                     clusters[-1].append(p)
             for cl in clusters:
-                max_ts = cl[0]["created_utc"]
-                span_min = max(1.0, (max_ts - cl[-1]["created_utc"]) / 60)
-                lim = 2 if len(cl) == 1 else min(25, max(len(cl) + 3, int(span_min / 2) + 4))
-                payload = self._get(
-                    f"/v1/subreddits/{sub}/posts",
-                    {"limit": lim, "sort": "new", "after": max_ts + 2},
-                    "info",
-                    priority,
-                )
-                for item in (payload.get("data") or {}).get("items", []):
-                    norm = normalize_redditdate_post(item)
-                    results[norm["id"]] = norm
+                try:
+                    max_ts = cl[0]["created_utc"]
+                    span_min = max(1.0, (max_ts - cl[-1]["created_utc"]) / 60)
+                    lim = 2 if len(cl) == 1 else min(25, max(len(cl) + 3, int(span_min / 2) + 4))
+                    payload = self._get(
+                        f"/v1/subreddits/{sub}/posts",
+                        {"limit": lim, "sort": "new", "after": max_ts + 2},
+                        "info",
+                        priority,
+                    )
+                    for item in (payload.get("data") or {}).get("items", []):
+                        norm = normalize_redditdate_post(item)
+                        results[norm["id"]] = norm
+                except Exception as e:
+                    log.warning("sub info error: %s", e)
+
+        # 对 targets 中最近 12 小时的前 10 篇高优先级 tracking 帖子，尝试调用 /v1/posts/{id}/comments 获取真实评论数
+        now = time.time()
+        recent_tracking = [
+            t for t in targets
+            if t.get("status") == "tracking" and t.get("created_utc", 0) >= now - 12 * 3600
+        ]
+        recent_tracking.sort(key=lambda x: (x.get("hot_score") or 0, x.get("score") or 0), reverse=True)
+        top_tracking = recent_tracking[:10]
+        for t in top_tracking:
+            tid = t["id"]
+            try:
+                c_payload = self._get(f"/v1/posts/{tid}/comments", {"limit": 10}, "comments", priority)
+                c_data = c_payload.get("data") if isinstance(c_payload, dict) else {}
+                items = (c_data.get("items") if isinstance(c_data, dict) else []) or []
+                total = (c_data.get("pagination") or {}).get("total") if isinstance(c_data, dict) else None
+                count = int(total) if total is not None else len(items)
+                if count > 0:
+                    if tid in results:
+                        results[tid]["num_comments"] = count
+                    else:
+                        with tx() as c:
+                            existing = row(c, "SELECT * FROM posts WHERE id=?", (tid,))
+                        if existing:
+                            results[tid] = {
+                                "id": tid,
+                                "subreddit": existing["subreddit"],
+                                "score": existing["score"],
+                                "num_comments": count,
+                                "upvote_ratio": existing["upvote_ratio"],
+                                "created_utc": existing["created_utc"],
+                                "images": json.loads(existing.get("images") or "[]"),
+                                "removed": False,
+                            }
+                    log.info("post %s real comments: %d (sample count=%d)", tid, count, len(items))
+            except Exception as e:
+                log.warning("post comments error for %s: %s", tid, e)
+
         return list(results.values())

@@ -17,7 +17,7 @@ from app.generator import weighted_len  # noqa: E402
 
 def build(skip_fetch: bool = False, push: bool = False) -> None:
     main._bootstrap()
-    db.update_settings({"poll_new_minutes": 20, "refresh_check_minutes": 20, "candidate_max_age_hours": 12, "min_comments": 5})
+    db.update_settings({"poll_new_minutes": 20, "refresh_check_minutes": 20, "candidate_max_age_hours": 24, "candidate_threshold": 20, "min_comments": 1})
 
     if not skip_fetch:
         scheduler.run_job("collect")
@@ -26,8 +26,8 @@ def build(skip_fetch: bool = False, push: bool = False) -> None:
         with tx() as c:
             ids = [r["id"] for r in c.execute("SELECT id FROM posts WHERE status='tracking'")]
         promoted = scoring.score_posts(ids)
-        if promoted:
-            pipeline.process_candidates()
+        pipeline.auto_promote_top_fresh(limit=3)
+        pipeline.process_candidates()
         if config.LLM_CONFIGURED:
             pipeline.translate_missing_titles(100)
         try:

@@ -57,7 +57,12 @@ async function _staticApi(path, opts = {}) {
       const posts = (b.posts || []).map(applyPost);
       const tweets = (b.tweets || []).map(applyTweet);
       const pending = new Set(tweets.filter((t) => t.status === "draft").map((t) => t.post_id)).size;
-      const valid = posts.filter((p) => ["tracking", "candidate", "drafted"].includes(p.status));
+      const cutoff36h = (b.status?.server_time || Date.now() / 1000) - 36 * 3600;
+      let valid = posts.filter((p) => ["tracking", "candidate", "drafted"].includes(p.status) && p.created_utc >= cutoff36h);
+      if (valid.length < 5) {
+        const cutoff72h = (b.status?.server_time || Date.now() / 1000) - 72 * 3600;
+        valid = posts.filter((p) => ["tracking", "candidate", "drafted"].includes(p.status) && p.created_utc >= cutoff72h);
+      }
       const latest = [...valid].sort((x, y) => y.created_utc - x.created_utc).slice(0, 10);
       const top = [...valid].sort((x, y) => (y.hot_score || 0) - (x.hot_score || 0)).slice(0, 10);
       return { ...b.overview, pending_review: pending, top, latest };

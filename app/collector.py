@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections import Counter
 
 from . import config, scoring, spam
 from .budget import QuotaExceeded
 from .db import get_settings, rows, tx
+
+log = logging.getLogger(__name__)
 
 MULTI_CHUNK = 20  # subreddits per multireddit request
 MAX_PAGES = 3
@@ -145,6 +148,9 @@ def refresh_due(client) -> dict:
         except QuotaExceeded:
             skipped += len(due) - i
             break
+        except Exception as e:
+            log.warning("refresh_due batch error: %s", e)
+            continue
         calls += 1
         now = time.time()
         got = {p["id"]: p for p in fresh}

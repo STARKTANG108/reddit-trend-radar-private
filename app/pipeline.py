@@ -119,11 +119,36 @@ def translate_missing_titles(limit: int = 100) -> int:
     return len(mapping)
 
 
+def auto_promote_top_fresh(limit: int = 3) -> list[str]:
+    now = int(time.time())
+    cutoff24h = now - 24 * 3600
+    with tx() as c:
+        candidates = c.execute(
+            """SELECT id FROM posts
+               WHERE status='tracking' AND (spam_reason IS NULL OR spam_reason = '') AND created_utc >= ?
+               ORDER BY hot_score DESC, num_comments DESC, score DESC
+               LIMIT ?""",
+            (cutoff24h, limit),
+        ).fetchall()
+        promoted_ids = [r["id"] for r in candidates]
+        if promoted_ids:
+            marks = ",".join("?" * len(promoted_ids))
+            c.execute(
+                f"UPDATE posts SET status='candidate', candidate_at=? WHERE id IN ({marks})",
+                [now, *promoted_ids],
+            )
+            log.info("auto promoted fresh candidates: %s", promoted_ids)
+    return promoted_ids
+
+
 def process_candidates() -> dict:
     if not get_settings()["auto_generate"]:
         return {"drafted": 0}
     with tx() as c:
         ids = [r["id"] for r in c.execute("SELECT id FROM posts WHERE status='candidate' ORDER BY hot_score DESC LIMIT 10")]
+    if not ids:
+        ids = auto_promote_top_fresh(limit=3)
     results = [draft_tweets(i, notify=True) for i in ids]
     return {"drafted": len(results), "sources": sorted({r["source"] for r in results})}
+
 
